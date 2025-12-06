@@ -20,6 +20,36 @@ print_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 print_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 print_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
+# Wait for dpkg/apt locks to be released
+wait_for_apt_lock() {
+  local i=0
+  local max_wait=300  # Maximum 5 minutes
+  
+  while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || \
+        fuser /var/lib/dpkg/lock >/dev/null 2>&1 || \
+        fuser /var/lib/apt/lists/lock >/dev/null 2>&1 || \
+        fuser /var/cache/apt/archives/lock >/dev/null 2>&1; do
+    
+    if [ $i -eq 0 ]; then
+      print_warning "Waiting for other package managers to finish..."
+      echo "This usually happens when automatic updates are running."
+    fi
+    
+    sleep 2
+    i=$((i + 1))
+    
+    if [ $i -gt $max_wait ]; then
+      print_error "Timeout waiting for package manager locks"
+      print_warning "Please wait for automatic updates to complete and try again"
+      exit 1
+    fi
+  done
+  
+  if [ $i -gt 0 ]; then
+    print_success "Package manager locks released"
+  fi
+}
+
 # Check if running as root
 if [ "$EUID" -ne 0 ]; then 
   print_error "Please run as root (use sudo)"
@@ -33,7 +63,9 @@ echo ""
 # 1. System Update
 ################################################################################
 print_status "Updating system packages..."
+wait_for_apt_lock
 apt update
+wait_for_apt_lock
 apt upgrade -y
 print_success "System updated"
 
@@ -43,6 +75,7 @@ print_success "System updated"
 print_status "Installing Node.js 20.x..."
 if ! command -v node &> /dev/null; then
   curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  wait_for_apt_lock
   apt-get install -y nodejs
   print_success "Node.js $(node -v) installed"
 else
@@ -54,6 +87,7 @@ fi
 ################################################################################
 print_status "Installing Nginx..."
 if ! command -v nginx &> /dev/null; then
+  wait_for_apt_lock
   apt install -y nginx
   systemctl enable nginx
   systemctl start nginx
@@ -67,6 +101,7 @@ fi
 ################################################################################
 print_status "Installing Certbot..."
 if ! command -v certbot &> /dev/null; then
+  wait_for_apt_lock
   apt install -y certbot python3-certbot-nginx
   print_success "Certbot installed"
 else
@@ -77,6 +112,7 @@ fi
 # 5. Install SQLite
 ################################################################################
 print_status "Installing SQLite..."
+wait_for_apt_lock
 apt install -y sqlite3 libsqlite3-dev
 print_success "SQLite installed"
 
@@ -207,6 +243,7 @@ fi
 ################################################################################
 print_status "Installing Git..."
 if ! command -v git &> /dev/null; then
+  wait_for_apt_lock
   apt install -y git
   print_success "Git installed"
 else

@@ -55,8 +55,11 @@ async function fetchDuckDuckGoSuggest(query: string): Promise<string[]> {
 
         if (Array.isArray(data)) {
             return data
-                .filter((item: unknown) => typeof item === 'object' && item !== null && 'phrase' in item)
-                .map((item: { phrase: string }) => item.phrase);
+                .filter((item: unknown): item is { phrase: string } =>
+                    typeof item === 'object' && item !== null && 'phrase' in item &&
+                    typeof (item as { phrase: unknown }).phrase === 'string'
+                )
+                .map((item) => item.phrase);
         }
         return [];
     } catch (error) {
