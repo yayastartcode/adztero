@@ -44,6 +44,3 @@ debug.ts
 test-*.ts
 check-*.ts
 scripts/test-*.ts
-
-# Admin config (contains password hash)
-src/config/admin.ts
