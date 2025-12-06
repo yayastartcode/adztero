@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Site {
+  id          String    @id @default(uuid())
+  subdomain   String    @unique
+  mainKeyword String
+  status      String    @default("pending") // pending, expanding, generating, deploying, deployed, error
+  progress    Int       @default(0) // 0-100 percentage
+  errorMsg    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  keywords    Keyword[]
+  articles    Article[]
+  jobs        Job[]
+}
+
+model Keyword {
+  id        String   @id @default(uuid())
+  keyword   String
+  siteId    String
+  site      Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  article   Article?
+  processed Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([siteId])
+}
+
+model Article {
+  id        String   @id @default(uuid())
+  title     String
+  slug      String
+  content   String   // Full HTML content
+  metaDesc  String
+  siteId    String
+  site      Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  keywordId String   @unique
+  keyword   Keyword  @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([siteId])
+}
+
+model Job {
+  id        String   @id @default(uuid())
+  type      String   // keyword_expansion, article_generation, static_generation, deployment
+  siteId    String
+  site      Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  status    String   @default("pending") // pending, running, completed, failed
+  payload   String?  // JSON data
+  error     String?
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([siteId])
+  @@index([status])
+}
